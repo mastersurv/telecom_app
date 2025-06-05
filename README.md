@@ -18,14 +18,39 @@
 - JWT аутентификация
 - Административная панель
 
+### POST:/api/user/login (Авторизация пользователя (выпуск токена))
+![image](https://github.com/user-attachments/assets/424f66a6-43d5-4e96-8ef5-73bec474b1ca)
+
+### GET:/api/equipment (Вывод пагинированного списка оборудования с возможностью поиска путем указания query параметров советующим ключам ответа)
+
+![image](https://github.com/user-attachments/assets/be61c564-7052-47cd-9cbe-f45a33a68553)
+
 ### Frontend (Vue.js SPA):
 - Авторизация пользователей
+
+![image](https://github.com/user-attachments/assets/2f9df014-4214-4333-b300-abd0c9ef950f)
+
 - Просмотр списка оборудования с поиском
 - Добавление нового оборудования (одного или массива)
+
+![image](https://github.com/user-attachments/assets/81b16b78-48df-4bbd-a02d-678f3a9e47f9)
+
+
 - Редактирование и удаление оборудования
+
+![image](https://github.com/user-attachments/assets/345fcf08-4e67-46df-9f8c-6ad9e7454aa9)
+![image](https://github.com/user-attachments/assets/58e4166c-a34a-4bcf-ae03-5708ec92ff25)
+
 - Просмотр типов оборудования
+
+![image](https://github.com/user-attachments/assets/be2edb96-4c8a-49c1-9a22-924230aacc12)
+
 - Адаптивный дизайн
+![image](https://github.com/user-attachments/assets/f5914861-a8ec-4f32-b291-3e1e0a8b4bcc)
+
 - Валидация данных на клиенте
+
+
 
 ### API Endpoints
 
@@ -334,25 +359,6 @@ RUN pip install -r requirements.txt
 COPY . .
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 ```
-
-## Поддержка
-
-При возникновении вопросов или проблем:
-1. Проверьте логи Django
-2. Убедитесь в корректности настроек базы данных
-3. Проверьте наличие всех зависимостей
-4. Убедитесь, что CORS настроен правильно для фронтенда
-
-## Возможные улучшения
-
-1. **Тестирование**: Добавить unit и integration тесты
-2. **Документация API**: Swagger/OpenAPI документация
-3. **Кэширование**: Redis для кэширования запросов
-4. **Логирование**: Структурированное логирование
-5. **Мониторинг**: Интеграция с системами мониторинга
-6. **CI/CD**: Автоматизация развертывания
-7. **Backup**: Автоматическое резервное копирование
-8. **Масштабирование**: Поддержка кластера
 
 ## Лицензия
 
