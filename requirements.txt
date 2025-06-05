@@ -1,0 +1,31 @@
+Django==5.2.1
+djangorestframework==3.16.0
+djangorestframework-simplejwt==5.5.0
+django-cors-headers==4.7.0
+django-filter==24.3
+python-dotenv==1.0.1
+
+# Core packages
+setuptools>=68.0.0
+wheel>=0.41.0
+
+# Database drivers
+mysqlclient==2.2.5
+
+# Testing and Coverage
+coverage==7.6.9
+pytest==8.3.4
+pytest-django==4.9.0
+pytest-cov==6.0.0
+factory-boy==3.3.1
+faker==33.1.0
+freezegun==1.5.1
+responses==0.25.3
+
+# Development tools
+black==24.10.0
+flake8==7.1.1
+isort==5.13.2
+
+# Optional: PyMySQL as alternative to mysqlclient
+# PyMySQL==1.1.2 

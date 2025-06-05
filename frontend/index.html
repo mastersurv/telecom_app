@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление оборудованием - Телеком</title>
+    
+    <!-- Vue.js 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <!-- Axios для HTTP запросов -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    
+    <style>
+        .equipment-card {
+            transition: transform 0.2s;
+        }
+        .equipment-card:hover {
+            transform: translateY(-2px);
+        }
+        .loading {
+            text-align: center;
+            padding: 2rem;
+        }
+        .error-message {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+        .success-message {
+            background-color: #d1edff;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .serial-number {
+            font-family: 'Courier New', monospace;
+            background-color: #f8f9fa;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Навигационная панель -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="#">
+                    <i class="bi bi-router"></i>
+                    Управление оборудованием
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <span class="navbar-text" v-if="user">
+                        <i class="bi bi-person"></i>
+                        {{ user.username }}
+                    </span>
+                    <button class="btn btn-outline-light ms-2" @click="logout" v-if="isAuthenticated">
+                        <i class="bi bi-box-arrow-right"></i>
+                        Выйти
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Форма авторизации -->
+        <div class="container mt-4" v-if="!isAuthenticated">
+            <div class="row justify-content-center">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4 class="mb-0">
+                                <i class="bi bi-shield-lock"></i>
+                                Авторизация
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <div v-if="loginError" class="error-message">
+                                {{ loginError }}
+                            </div>
+                            <form @submit.prevent="login">
+                                <div class="mb-3">
+                                    <label for="username" class="form-label">Имя пользователя</label>
+                                    <input 
+                                        type="text" 
+                                        class="form-control" 
+                                        id="username" 
+                                        v-model="loginForm.username"
+                                        required
+                                    >
+                                </div>
+                                <div class="mb-3">
+                                    <label for="password" class="form-label">Пароль</label>
+                                    <input 
+                                        type="password" 
+                                        class="form-control" 
+                                        id="password" 
+                                        v-model="loginForm.password"
+                                        required
+                                    >
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100" :disabled="isLoading">
+                                    <span v-if="isLoading" class="spinner-border spinner-border-sm me-2"></span>
+                                    Войти
+                                </button>
+                            </form>
+                            <div class="mt-3">
+                                <small class="text-muted">
+                                    Тестовые данные: testuser / test123
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Основное приложение -->
+        <div class="container mt-4" v-if="isAuthenticated">
+            <!-- Вкладки -->
+            <ul class="nav nav-tabs mb-4">
+                <li class="nav-item">
+                    <a class="nav-link" :class="{ active: activeTab === 'list' }" @click="activeTab = 'list'">
+                        <i class="bi bi-list"></i>
+                        Список оборудования
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" :class="{ active: activeTab === 'add' }" @click="activeTab = 'add'">
+                        <i class="bi bi-plus-circle"></i>
+                        Добавить оборудование
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" :class="{ active: activeTab === 'types' }" @click="activeTab = 'types'">
+                        <i class="bi bi-tags"></i>
+                        Типы оборудования
+                    </a>
+                </li>
+            </ul>
+
+            <!-- Сообщения -->
+            <div v-if="successMessage" class="success-message">
+                <i class="bi bi-check-circle"></i>
+                {{ successMessage }}
+            </div>
+            <div v-if="errorMessage" class="error-message">
+                <i class="bi bi-exclamation-triangle"></i>
+                {{ errorMessage }}
+            </div>
+
+            <!-- Вкладка: Список оборудования -->
+            <div v-if="activeTab === 'list'">
+                <!-- Поиск и фильтры -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label class="form-label">Поиск</label>
+                                <input 
+                                    type="text" 
+                                    class="form-control" 
+                                    placeholder="Серийный номер, примечание..."
+                                    v-model="searchQuery"
+                                    @input="searchEquipment"
+                                >
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Тип оборудования</label>
+                                <select class="form-select" v-model="selectedType" @change="searchEquipment">
+                                    <option value="">Все типы</option>
+                                    <option v-for="type in equipmentTypes" :key="type.id" :value="type.id">
+                                        {{ type.name }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button class="btn btn-outline-secondary" @click="clearFilters">
+                                    <i class="bi bi-x-circle"></i>
+                                    Очистить
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Список оборудования -->
+                <div v-if="isLoading" class="loading">
+                    <div class="spinner-border text-primary"></div>
+                    <p class="mt-2">Загрузка...</p>
+                </div>
+
+                <div v-else>
+                    <div class="row">
+                        <div class="col-md-6 col-lg-4 mb-3" v-for="equipment in equipmentList" :key="equipment.id">
+                            <div class="card equipment-card h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="bi bi-router text-primary"></i>
+                                        {{ equipment.equipment_type_name }}
+                                    </h6>
+                                    <p class="card-text">
+                                        <strong>Серийный номер:</strong><br>
+                                        <span class="serial-number">{{ equipment.serial_number }}</span>
+                                    </p>
+                                    <p class="card-text" v-if="equipment.note">
+                                        <strong>Примечание:</strong><br>
+                                        {{ equipment.note }}
+                                    </p>
+                                    <small class="text-muted">
+                                        Создано: {{ formatDate(equipment.created_at) }}
+                                    </small>
+                                </div>
+                                <div class="card-footer">
+                                    <button 
+                                        class="btn btn-sm btn-outline-primary me-2" 
+                                        @click="editEquipment(equipment)"
+                                    >
+                                        <i class="bi bi-pencil"></i>
+                                        Редактировать
+                                    </button>
+                                    <button 
+                                        class="btn btn-sm btn-outline-danger" 
+                                        @click="deleteEquipment(equipment.id)"
+                                    >
+                                        <i class="bi bi-trash"></i>
+                                        Удалить
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Пагинация -->
+                    <nav v-if="pagination.count > 0">
+                        <ul class="pagination justify-content-center">
+                            <li class="page-item" :class="{ disabled: !pagination.previous }">
+                                <a class="page-link" @click="loadPage(currentPage - 1)">Предыдущая</a>
+                            </li>
+                            <li class="page-item active">
+                                <span class="page-link">{{ currentPage }}</span>
+                            </li>
+                            <li class="page-item" :class="{ disabled: !pagination.next }">
+                                <a class="page-link" @click="loadPage(currentPage + 1)">Следующая</a>
+                            </li>
+                        </ul>
+                        <p class="text-center text-muted">
+                            Всего записей: {{ pagination.count }}
+                        </p>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Вкладка: Добавить оборудование -->
+            <div v-if="activeTab === 'add'">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-plus-circle"></i>
+                            Добавить оборудование
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form @submit.prevent="addEquipment">
+                            <div class="mb-3">
+                                <label class="form-label">Тип оборудования *</label>
+                                <select class="form-select" v-model="addForm.equipment_type" required>
+                                    <option value="">Выберите тип</option>
+                                    <option v-for="type in equipmentTypes" :key="type.id" :value="type.id">
+                                        {{ type.name }} ({{ type.serial_mask }})
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Серийные номера *</label>
+                                <textarea 
+                                    class="form-control" 
+                                    rows="3"
+                                    placeholder="Введите серийные номера, каждый с новой строки"
+                                    v-model="addForm.serial_numbers_text"
+                                    required
+                                ></textarea>
+                                <small class="form-text text-muted">
+                                    Введите серийные номера, каждый с новой строки. 
+                                    Они будут проверены на соответствие маске выбранного типа.
+                                </small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Примечание</label>
+                                <textarea 
+                                    class="form-control" 
+                                    rows="2"
+                                    placeholder="Дополнительная информация об оборудовании"
+                                    v-model="addForm.note"
+                                ></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary" :disabled="isLoading">
+                                <span v-if="isLoading" class="spinner-border spinner-border-sm me-2"></span>
+                                <i class="bi bi-plus-circle"></i>
+                                Добавить
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Вкладка: Типы оборудования -->
+            <div v-if="activeTab === 'types'">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-tags"></i>
+                            Типы оборудования
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Название</th>
+                                        <th>Маска серийного номера</th>
+                                        <th>Количество оборудования</th>
+                                        <th>Дата создания</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="type in equipmentTypes" :key="type.id">
+                                        <td>{{ type.id }}</td>
+                                        <td>{{ type.name }}</td>
+                                        <td><code>{{ type.serial_mask }}</code></td>
+                                        <td>{{ type.equipment_count }}</td>
+                                        <td>{{ formatDate(type.created_at) }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Модальное окно редактирования -->
+        <div class="modal fade" id="editModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="bi bi-pencil"></i>
+                            Редактировать оборудование
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form @submit.prevent="updateEquipment">
+                            <div class="mb-3">
+                                <label class="form-label">Тип оборудования</label>
+                                <select class="form-select" v-model="editForm.equipment_type">
+                                    <option v-for="type in equipmentTypes" :key="type.id" :value="type.id">
+                                        {{ type.name }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Серийный номер</label>
+                                <input 
+                                    type="text" 
+                                    class="form-control" 
+                                    v-model="editForm.serial_number"
+                                    required
+                                >
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Примечание</label>
+                                <textarea 
+                                    class="form-control" 
+                                    rows="2"
+                                    v-model="editForm.note"
+                                ></textarea>
+                            </div>
+                            <div class="d-flex justify-content-end">
+                                <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">
+                                    Отмена
+                                </button>
+                                <button type="submit" class="btn btn-primary" :disabled="isLoading">
+                                    <span v-if="isLoading" class="spinner-border spinner-border-sm me-2"></span>
+                                    Сохранить
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Основной скрипт приложения -->
+    <script>
+        // Автоматическое определение пути к app.js
+        const appJsPath = window.location.pathname === '/' && window.location.port === '8000' 
+            ? '/frontend/app.js'  // Django сервер
+            : 'app.js';           // http-server или другой статический сервер
+        
+        const script = document.createElement('script');
+        script.src = appJsPath;
+        script.onerror = function() {
+            // Если не удалось загрузить, пробуем альтернативный путь
+            const altScript = document.createElement('script');
+            altScript.src = appJsPath === 'app.js' ? '/frontend/app.js' : 'app.js';
+            document.head.appendChild(altScript);
+        };
+        document.head.appendChild(script);
+    </script>
+</body>
+</html> 
