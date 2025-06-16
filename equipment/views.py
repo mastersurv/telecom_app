@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from rest_framework import generics, status, filters
+from rest_framework import generics, status, filters, viewsets
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -13,6 +13,7 @@ from .serializers import (
     EquipmentTypeSerializer
 )
 from .filters import EquipmentFilter
+from .pagination import CustomPageNumberPagination
 
 
 class EquipmentListCreateView(generics.ListCreateAPIView):
@@ -30,6 +31,7 @@ class EquipmentListCreateView(generics.ListCreateAPIView):
     search_fields = ['serial_number', 'note', 'equipment_type__name']
     ordering_fields = ['created_at', 'updated_at', 'serial_number']
     ordering = ['-created_at']
+    pagination_class = CustomPageNumberPagination
     
     def get_serializer_class(self):
         """
@@ -105,11 +107,17 @@ class EquipmentDetailView(generics.RetrieveUpdateDestroyAPIView):
         }, status=status.HTTP_200_OK)
 
 
-class EquipmentTypeListView(generics.ListAPIView):
+class EquipmentTypeViewSet(viewsets.ModelViewSet):
     """
-    API endpoint для получения списка типов оборудования.
+    ViewSet для полноценного REST API работы с типами оборудования.
     
-    GET: возвращает пагинированный список типов оборудования с возможностью поиска
+    Поддерживает все CRUD операции:
+    GET /api/equipment/types/ - список типов
+    POST /api/equipment/types/ - создание нового типа
+    GET /api/equipment/types/{id}/ - получение типа по ID
+    PUT /api/equipment/types/{id}/ - обновление типа
+    PATCH /api/equipment/types/{id}/ - частичное обновление типа
+    DELETE /api/equipment/types/{id}/ - удаление типа
     """
     
     queryset = EquipmentType.objects.prefetch_related('equipment').all()
@@ -119,6 +127,7 @@ class EquipmentTypeListView(generics.ListAPIView):
     search_fields = ['name', 'serial_mask']
     ordering_fields = ['name', 'created_at']
     ordering = ['name']
+    pagination_class = CustomPageNumberPagination
     
     def get_queryset(self):
         """
@@ -128,11 +137,11 @@ class EquipmentTypeListView(generics.ListAPIView):
         
         name = self.request.query_params.get('name')
         if name:
-            queryset = queryset.filter(name__icontains=name)
+            queryset = queryset.filter(name__exact=name)
         
         serial_mask = self.request.query_params.get('serial_mask')
         if serial_mask:
-            queryset = queryset.filter(serial_mask__icontains=serial_mask)
+            queryset = queryset.filter(serial_mask__exact=serial_mask)
         
         return queryset
 
@@ -146,7 +155,7 @@ def equipment_stats(request):
     Возвращает общее количество оборудования, количество по типам и т.д.
     """
     
-    total_equipment = Equipment.objects.count()  # Только активные (через objects manager)
+    total_equipment = Equipment.objects.count()
     total_deleted = Equipment.all_objects.filter(deleted_at__isnull=False).count()
     total_types = EquipmentType.objects.count()
     
@@ -162,7 +171,7 @@ def equipment_stats(request):
     return Response({
         'total_equipment': total_equipment,
         'total_deleted': total_deleted,
-        'total_active': total_equipment,  # total_equipment уже содержит только активные
+        'total_active': total_equipment,
         'total_types': total_types,
         'type_statistics': type_stats
     })

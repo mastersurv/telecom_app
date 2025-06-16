@@ -1,5 +1,66 @@
 from django.contrib import admin
+from django.core.exceptions import ValidationError
+from django import forms
 from .models import EquipmentType, Equipment
+
+
+class EquipmentAdminForm(forms.ModelForm):
+    """
+    Форма для административной панели с валидацией.
+    """
+    
+    class Meta:
+        model = Equipment
+        fields = '__all__'
+    
+    def clean_serial_number(self):
+        """
+        Валидация серийного номера согласно маске типа оборудования.
+        """
+        serial_number = self.cleaned_data.get('serial_number')
+        equipment_type = self.cleaned_data.get('equipment_type')
+        
+        if not serial_number:
+            raise ValidationError('Серийный номер обязателен для заполнения.')
+        
+        if not equipment_type:
+            raise ValidationError('Тип оборудования должен быть выбран.')
+        
+        if not equipment_type.validate_serial_number(serial_number):
+            raise ValidationError(
+                f'Серийный номер "{serial_number}" не соответствует маске "{equipment_type.serial_mask}" '
+                f'для типа оборудования "{equipment_type.name}". '
+                f'Пожалуйста, проверьте правильность ввода.'
+            )
+        
+        existing_equipment = Equipment.all_objects.filter(
+            equipment_type=equipment_type,
+            serial_number=serial_number
+        ).exclude(pk=self.instance.pk if self.instance else None)
+        
+        if existing_equipment.exists():
+            existing = existing_equipment.first()
+            if existing.is_deleted:
+                raise ValidationError(
+                    f'Оборудование с серийным номером "{serial_number}" уже существует, '
+                    f'но было удалено {existing.deleted_at.strftime("%d.%m.%Y %H:%M")}. '
+                    f'Восстановите существующую запись или используйте другой серийный номер.'
+                )
+            else:
+                raise ValidationError(
+                    f'Оборудование с серийным номером "{serial_number}" '
+                    f'для типа "{equipment_type.name}" уже существует.'
+                )
+        
+        return serial_number
+    
+    def clean(self):
+        """
+        Общая валидация формы.
+        """
+        cleaned_data = super().clean()
+        
+        return cleaned_data
 
 
 @admin.register(EquipmentType)
@@ -29,6 +90,8 @@ class EquipmentAdmin(admin.ModelAdmin):
     Админ панель для оборудования.
     """
     
+    form = EquipmentAdminForm
+    
     list_display = [
         'id', 
         'equipment_type', 
@@ -50,7 +113,8 @@ class EquipmentAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Основная информация', {
-            'fields': ('equipment_type', 'serial_number', 'note')
+            'fields': ('equipment_type', 'serial_number', 'note'),
+            'description': 'Серийный номер должен соответствовать маске выбранного типа оборудования.'
         }),
         ('Системная информация', {
             'fields': ('created_at', 'updated_at', 'deleted_at'),
